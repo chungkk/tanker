@@ -1,4 +1,5 @@
 import { TANKERKOENIG_BASE_URL, TANKERKOENIG_API_KEY } from '../config.js';
+import { ApiError } from '../http.js';
 
 const BASE_URL = TANKERKOENIG_BASE_URL;
 const API_KEY = TANKERKOENIG_API_KEY;
@@ -58,7 +59,14 @@ export async function getByIds(ids) {
  */
 export async function getStationDetail(id) {
   const url = `${BASE_URL}/json/detail.php?apikey=${API_KEY}&id=${id}`;
-  const data = await fetchJson(url);
+  let data;
+  try {
+    data = await fetchJson(url);
+  } catch (err) {
+    // Tankerkönig báo "Station nicht vorhanden" (ok: false) khi ID không tồn tại → 404
+    if (/nicht vorhanden/i.test(err.message)) return null;
+    throw err;
+  }
 
   if (!data.station) return null;
   return normalizeStation(data.station);
@@ -103,14 +111,16 @@ function normalizeStation(s) {
  * Cache 5 phút (Tankerkönig chỉ cập nhật giá vài phút/lần) để tiết kiệm quota
  */
 async function fetchJson(url) {
+  if (!API_KEY) throw new Error('Chưa cấu hình TANKERKOENIG_API_KEY');
+
   const res = await fetch(url, { next: { revalidate: CACHE_SECONDS } });
   if (!res.ok) {
-    throw new Error(`Tankerkönig HTTP ${res.status}`);
+    throw new ApiError(502, `Tankerkönig HTTP ${res.status}`);
   }
 
   const data = await res.json();
   if (data.ok === false) {
-    throw new Error(`Tankerkönig: ${data.message || 'Unknown error'}`);
+    throw new ApiError(502, `Tankerkönig: ${data.message || 'Unknown error'}`);
   }
 
   return data;

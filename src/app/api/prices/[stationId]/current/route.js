@@ -1,33 +1,26 @@
-import { NextResponse } from 'next/server';
 import { getByIds } from '@/lib/services/tankerkoenig';
+import { ApiError, handler, ok, parseStationId } from '@/lib/http';
 
 /**
  * GET /api/prices/:stationId/current
  * Lấy giá hiện tại của trạm
  */
-export async function GET(request, { params }) {
-  try {
-    const { stationId } = await params;
-    const { stations } = await getByIds([stationId]);
-    const station = stations[0];
+export const GET = handler(async (request, { params }) => {
+  const stationId = parseStationId((await params).stationId);
+  const { stations } = await getByIds([stationId]);
+  const station = stations[0];
 
-    if (!station || !station.fuels.length) {
-      return NextResponse.json(
-        { error: 'Không có dữ liệu giá cho trạm này.' },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json({
-      station_id: stationId,
-      isOpen: station.isOpen,
-      prices: station.fuels.map((f) => ({
-        fuel: f.name,
-        category: f.category,
-        price: f.price,
-      })),
-    });
-  } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  if (!station || !station.fuels.length) {
+    throw new ApiError(404, 'Không có dữ liệu giá cho trạm này.');
   }
-}
+
+  return ok({
+    station_id: stationId,
+    isOpen: station.isOpen,
+    prices: station.fuels.map((f) => ({
+      fuel: f.name,
+      category: f.category,
+      price: f.price,
+    })),
+  });
+});

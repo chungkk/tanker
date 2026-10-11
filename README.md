@@ -5,7 +5,11 @@ API giá xăng Đức — Giá realtime + So sánh rẻ/đắt theo khu vực.
 **Nguồn dữ liệu**: [Tankerkönig](https://creativecommons.tankerkoenig.de/) (MTS-K / Bundeskartellamt)  
 **License**: CC BY 4.0 — Hợp pháp, kể cả sử dụng thương mại (cần ghi nguồn).
 
-Không dùng database: mỗi request gọi thẳng Tankerkönig, kết quả được cache 5 phút → deploy được lên Vercel.
+Backend API thuần (JSON), không database: mỗi request gọi thẳng Tankerkönig, kết quả được cache trên CDN 5 phút → deploy được lên Vercel, nhanh và tiết kiệm quota.
+
+- Chỉ hỗ trợ `GET`, CORS mở cho mọi domain → frontend ở domain khác gọi trực tiếp được.
+- Lỗi trả về dạng `{ "error": "..." }` với status `400` (tham số sai), `404` (không tìm thấy), `502` (Tankerkönig lỗi), `500`.
+- Tài liệu API dạng JSON: `GET /` hoặc `GET /api`.
 
 ## Cài Đặt
 
@@ -21,8 +25,6 @@ cp .env.example .env
 # 3. Chạy server
 npm run dev
 ```
-
-Trang test giao diện: `http://localhost:3000/test`
 
 ## Deploy lên Vercel
 
@@ -68,14 +70,15 @@ fuel-price-api/
 ├── src/
 │   ├── app/
 │   │   ├── api/                  # Route handlers (các endpoint ở trên)
-│   │   └── test/                 # Trang test giao diện
+│   │   ├── route.js              # GET / → tài liệu API
+│   │   └── [...slug]/route.js    # 404 dạng JSON
 │   ├── lib/
 │   │   ├── config.js             # Cấu hình
+│   │   ├── http.js               # Response JSON + cache CDN, lỗi, validate tham số
 │   │   └── services/
 │   │       ├── tankerkoenig.js   # Client gọi Tankerkönig API (cache 5 phút)
 │   │       ├── geocode.js        # Mã bưu điện → tọa độ (OpenStreetMap Nominatim)
 │   │       └── compare.js        # So sánh giá rẻ/đắt trong khu vực
-│   └── proxy.js                  # Rate limiting (60 req/phút/IP)
 ├── .env                          # API key (không commit)
 └── package.json
 ```
