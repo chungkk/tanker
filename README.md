@@ -1,9 +1,11 @@
 # 🛢️ Fuel Price API
 
-API giá xăng Đức — Dữ liệu realtime + Lịch sử + Dự đoán giá.
+API giá xăng Đức — Giá realtime + So sánh rẻ/đắt theo khu vực.
 
 **Nguồn dữ liệu**: [Tankerkönig](https://creativecommons.tankerkoenig.de/) (MTS-K / Bundeskartellamt)  
-**License**: CC BY 4.0 — Hợp pháp, kể cả sử dụng thương mại.
+**License**: CC BY 4.0 — Hợp pháp, kể cả sử dụng thương mại (cần ghi nguồn).
+
+Không dùng database: mỗi request gọi thẳng Tankerkönig, kết quả được cache 5 phút → deploy được lên Vercel.
 
 ## Cài Đặt
 
@@ -20,37 +22,31 @@ cp .env.example .env
 npm run dev
 ```
 
+Trang test giao diện: `http://localhost:3000/test`
+
+## Deploy lên Vercel
+
+Import repo vào Vercel, thêm biến môi trường `TANKERKOENIG_API_KEY`, deploy. Không cần cấu hình gì thêm.
+
 ## API Endpoints
 
-### Trạm Xăng
-
 | Method | Endpoint | Mô tả |
 |---|---|---|
-| GET | `/api/stations/search?lat=&lng=&rad=` | Tìm trạm theo tọa độ |
-| GET | `/api/stations/postalcode/:code` | Tìm theo mã bưu điện |
-| GET | `/api/stations/watched` | Danh sách trạm đang theo dõi |
+| GET | `/api/stations/search?lat=&lng=&rad=` | Tìm trạm theo tọa độ + so sánh giá |
+| GET | `/api/stations/postalcode/:code?rad=` | Tìm trạm theo mã bưu điện + so sánh giá |
 | GET | `/api/stations/:id` | Chi tiết 1 trạm |
-| POST | `/api/stations/watch` | Thêm vùng vào watchlist |
-| POST | `/api/stations/watch/:id` | Thêm 1 trạm cụ thể |
-| DELETE | `/api/stations/watch/:id` | Xóa khỏi watchlist |
+| GET | `/api/prices/:id/current` | Giá hiện tại của 1 trạm |
+| GET | `/api/stats/global` | Giá trung bình tham khảo (mẫu quanh tâm nước Đức) |
 
-### Giá
+### So sánh rẻ/đắt
 
-| Method | Endpoint | Mô tả |
-|---|---|---|
-| GET | `/api/prices/:id/current` | Giá hiện tại |
-| GET | `/api/prices/:id/history?fuel=&days=` | Lịch sử giá |
-| GET | `/api/prices/:id/forecast?fuel=&hours=` | Dự đoán giá |
-| GET | `/api/prices/:id/best-time?fuel=` | Thời điểm rẻ nhất |
-| GET | `/api/prices/:id/stats?days=` | Thống kê min/max/avg |
+Kết quả `search` và `postalcode` có thêm:
 
-### Thống Kê
-
-| Method | Endpoint | Mô tả |
-|---|---|---|
-| GET | `/api/stats/global` | Giá trung bình toàn quốc |
-| GET | `/api/stats/local` | Thống kê dữ liệu đã thu thập |
-| POST | `/api/stats/collect` | Thu thập giá ngay |
+- `summary` — giá `min` / `avg` / `max` của từng loại nhiên liệu trong khu vực (chỉ tính trạm đang mở).
+- Mỗi giá trong `stations[].fuels[]` có:
+  - `diffFromAvg` — chênh lệch so với giá trung bình khu vực (EUR, âm = rẻ hơn)
+  - `level` — `cheap` / `average` / `expensive` (ngưỡng ±2 cent)
+  - `isCheapest` — trạm rẻ nhất khu vực cho loại nhiên liệu đó
 
 ## Ví Dụ Sử Dụng
 
@@ -58,19 +54,11 @@ npm run dev
 # Tìm trạm xăng quanh Halle (Saale)
 curl "http://localhost:3000/api/stations/search?lat=51.4947&lng=11.989&rad=5"
 
-# Thêm trạm vào watchlist
-curl -X POST "http://localhost:3000/api/stations/watch" \
-  -H "Content-Type: application/json" \
-  -d '{"lat": 51.4947, "lng": 11.989, "radius": 5}'
+# Tìm theo mã bưu điện
+curl "http://localhost:3000/api/stations/postalcode/06118?rad=5"
 
-# Xem lịch sử giá 7 ngày
-curl "http://localhost:3000/api/prices/{station-id}/history?fuel=Diesel&days=7"
-
-# Dự đoán giá 24h
-curl "http://localhost:3000/api/prices/{station-id}/forecast?fuel=Diesel"
-
-# Thời điểm rẻ nhất
-curl "http://localhost:3000/api/prices/{station-id}/best-time?fuel=Diesel"
+# Giá hiện tại 1 trạm
+curl "http://localhost:3000/api/prices/{station-id}/current"
 ```
 
 ## Kiến Trúc
@@ -78,20 +66,16 @@ curl "http://localhost:3000/api/prices/{station-id}/best-time?fuel=Diesel"
 ```
 fuel-price-api/
 ├── src/
-│   ├── server.js              # Express server + routes
-│   ├── config.js              # Cấu hình
-│   ├── database.js            # SQLite setup + queries
-│   ├── routes/
-│   │   ├── stations.js        # Tìm + quản lý trạm
-│   │   ├── prices.js          # Giá + lịch sử + dự đoán
-│   │   └── stats.js           # Thống kê
-│   ├── services/
-│   │   ├── tankerkoenig.js    # Client gọi Tankerkönig API
-│   │   ├── collector.js       # Cron job thu thập giá
-│   │   └── forecast.js        # Thuật toán dự đoán giá
-│   └── middleware/
-│       └── rateLimit.js       # Rate limiting
-├── data/                      # SQLite database (auto-created)
-├── .env                       # API key (không commit)
+│   ├── app/
+│   │   ├── api/                  # Route handlers (các endpoint ở trên)
+│   │   └── test/                 # Trang test giao diện
+│   ├── lib/
+│   │   ├── config.js             # Cấu hình
+│   │   └── services/
+│   │       ├── tankerkoenig.js   # Client gọi Tankerkönig API (cache 5 phút)
+│   │       ├── geocode.js        # Mã bưu điện → tọa độ (OpenStreetMap Nominatim)
+│   │       └── compare.js        # So sánh giá rẻ/đắt trong khu vực
+│   └── proxy.js                  # Rate limiting (60 req/phút/IP)
+├── .env                          # API key (không commit)
 └── package.json
 ```

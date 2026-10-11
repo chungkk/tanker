@@ -2,6 +2,7 @@ import { TANKERKOENIG_BASE_URL, TANKERKOENIG_API_KEY } from '../config.js';
 
 const BASE_URL = TANKERKOENIG_BASE_URL;
 const API_KEY = TANKERKOENIG_API_KEY;
+const CACHE_SECONDS = 300;
 
 /**
  * Tìm trạm xăng theo tọa độ + bán kính
@@ -83,9 +84,10 @@ function normalizeStation(s) {
     id: s.id,
     name: s.name || '',
     brand: s.brand || '',
-    street: s.street || '',
+    street: (s.street || '').trim(),
     houseNumber: s.houseNumber || '',
-    postalCode: String(s.postCode || s.postalCode || ''),
+    // Tankerkönig trả postCode dạng số → mất số 0 đầu (06118 → 6118)
+    postalCode: s.postCode || s.postalCode ? String(s.postCode || s.postalCode).padStart(5, '0') : '',
     place: s.place || '',
     coords: { lat: s.lat, lng: s.lng },
     isOpen: s.isOpen === true,
@@ -98,9 +100,10 @@ function normalizeStation(s) {
 
 /**
  * Fetch + parse JSON + error handling
+ * Cache 5 phút (Tankerkönig chỉ cập nhật giá vài phút/lần) để tiết kiệm quota
  */
 async function fetchJson(url) {
-  const res = await fetch(url);
+  const res = await fetch(url, { next: { revalidate: CACHE_SECONDS } });
   if (!res.ok) {
     throw new Error(`Tankerkönig HTTP ${res.status}`);
   }

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStmts } from '@/lib/database';
+import { getByIds } from '@/lib/services/tankerkoenig';
 
 /**
  * GET /api/prices/:stationId/current
@@ -8,10 +8,10 @@ import { getStmts } from '@/lib/database';
 export async function GET(request, { params }) {
   try {
     const { stationId } = await params;
-    const stmts = getStmts();
-    const prices = stmts.getCurrentPrices.all(stationId);
+    const { stations } = await getByIds([stationId]);
+    const station = stations[0];
 
-    if (!prices.length) {
+    if (!station || !station.fuels.length) {
       return NextResponse.json(
         { error: 'Không có dữ liệu giá cho trạm này.' },
         { status: 404 }
@@ -20,11 +20,11 @@ export async function GET(request, { params }) {
 
     return NextResponse.json({
       station_id: stationId,
-      prices: prices.map((p) => ({
-        fuel: p.fuel_name,
-        category: p.fuel_category,
-        price: p.price,
-        updated: p.recorded_at,
+      isOpen: station.isOpen,
+      prices: station.fuels.map((f) => ({
+        fuel: f.name,
+        category: f.category,
+        price: f.price,
       })),
     });
   } catch (err) {

@@ -1,62 +1,39 @@
 import { NextResponse } from 'next/server';
-import { getStmts } from '@/lib/database';
+import { searchStations } from '@/lib/services/tankerkoenig';
+import { geocodePostalCode } from '@/lib/services/geocode';
+import { buildStationList } from '@/lib/services/compare';
 
 /**
  * GET /api/stations/postalcode/:code
- * Tìm trạm theo mã bưu điện
+ * Tìm trạm theo mã bưu điện (đổi sang tọa độ rồi tìm như /search)
+ * Query: rad (km, mặc định 5, max 25)
  */
 export async function GET(request, { params }) {
   try {
     const { code } = await params;
+    const { searchParams } = new URL(request.url);
+    const rad = parseFloat(searchParams.get('rad') || '5');
 
-    // Tìm trong DB local theo postal_code
-    const stmts = getStmts();
-    const stations = stmts.searchStations
-      ? []
-      : [];
-
-    // Gọi Tankerkönig API để tìm trạm
-    const { searchStations } = await import('@/lib/services/tankerkoenig');
-
-    // Dùng geocoding đơn giản cho postal code Đức (approximate center)
-    // Tankerkönig không có endpoint tìm theo postal code trực tiếp
-    // Nên ta tìm trong DB local trước
-    const localStations = stmts.getStation
-      ? (() => {
-          try {
-            // Tìm trạm có postal_code trùng khớp trong DB
-            const { getDb } = require('@/lib/database');
-            const db = getDb();
-            const results = db
-              .prepare(
-                `SELECT * FROM stations WHERE postal_code = ? ORDER BY name`
-              )
-              .all(code);
-            return results;
-          } catch {
-            return [];
-          }
-        })()
-      : [];
-
-    if (localStations.length > 0) {
-      return NextResponse.json({
-        count: localStations.length,
-        source: 'local_db',
-        stations: localStations.map((s) => ({
-          ...s,
-          opening_times: JSON.parse(s.opening_times || '[]'),
-        })),
-      });
+    if (!/^\d{5}$/.test(code)) {
+      return NextResponse.json(
+        { error: 'Mã bưu điện Đức phải có 5 chữ số (ví dụ: 06118).' },
+        { status: 400 }
+      );
     }
 
-    // Fallback: tìm trên Tankerkönig bằng tọa độ approximate
-    // (Cần geocoding service thực tế, đây chỉ là placeholder)
+    const location = await geocodePostalCode(code);
+    if (!location) {
+      return NextResponse.json(
+        { error: `Không tìm thấy mã bưu điện ${code}.` },
+        { status: 404 }
+      );
+    }
+
+    const data = await searchStations(location.lat, location.lng, rad);
+
     return NextResponse.json({
-      count: 0,
-      source: 'tankerkoenig',
-      stations: [],
-      note: 'Không tìm thấy trạm. Hãy dùng /api/stations/search với tọa độ.',
+      location,
+      ...buildStationList(data.stations || []),
     });
   } catch (err) {
     return NextResponse.json({ error: err.message }, { status: 500 });
