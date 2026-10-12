@@ -40,6 +40,12 @@ export const GET = handler(async () => {
           example: '/api/stations/d1eae26d-910f-4430-8d9b-281d6316c3cd',
         },
         {
+          path: '/api/prices',
+          description: 'Giá hiện tại của nhiều trạm (tối đa 10) trong 1 request',
+          params: { ids: 'Danh sách ID trạm, ngăn cách bằng dấu phẩy' },
+          example: '/api/prices?ids=d1eae26d-910f-4430-8d9b-281d6316c3cd,278130b1-e062-4a0f-80cc-19e486b4c024',
+        },
+        {
           path: '/api/prices/:stationId/current',
           description: 'Giá hiện tại của 1 trạm',
           example: '/api/prices/d1eae26d-910f-4430-8d9b-281d6316c3cd/current',

@@ -38,6 +38,7 @@ Import repo vào Vercel, thêm biến môi trường `TANKERKOENIG_API_KEY`, dep
 | GET | `/api/stations/postalcode/:code?rad=` | Tìm trạm theo mã bưu điện + so sánh giá |
 | GET | `/api/stations/:id` | Chi tiết 1 trạm |
 | GET | `/api/prices/:id/current` | Giá hiện tại của 1 trạm |
+| GET | `/api/prices?ids=a,b,c` | Giá hiện tại của nhiều trạm (tối đa 10) |
 | GET | `/api/stats/global` | Giá trung bình tham khảo (mẫu quanh tâm nước Đức) |
 
 ### So sánh rẻ/đắt
