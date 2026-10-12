@@ -5,5 +5,5 @@ import { ApiError, fail } from '@/lib/http';
  */
 export function GET(request) {
   const { pathname } = new URL(request.url);
-  return fail(new ApiError(404, `Không có endpoint ${pathname}. Xem danh sách tại /api`));
+  return fail(new ApiError(404, `Không tìm thấy ${pathname}.`));
 }
